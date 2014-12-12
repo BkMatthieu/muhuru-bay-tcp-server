@@ -24,6 +24,9 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.CharsetUtil;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 
 import org.mbmg.tcp.util.Parser;
 import org.mbmg.tcp.util.Record;
@@ -39,38 +42,66 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.net.*;
 import java.io.*;
 
-public class ServerHandler {
-
+public class ServerHandler extends ChannelInboundHandlerAdapter {
+	
     private final GraphiteClient graphiteClient;
 
-    public ServerHandler(int port, String graphiteHost, int graphitePort) {
+    public ServerHandler (String graphiteHost, int graphitePort) {
         graphiteClient = new GraphiteClient(graphiteHost,graphitePort);
-        new Consumer().run(port);
+    }
+    
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        ByteBuf in = (ByteBuf) msg;
+        try {
+            while (in.isReadable()) {
+            	/*
+                System.out.print((char) in.readByte());
+                System.out.flush();
+                */
+            	String recievedContent = in.toString();
+            	System.out.println(recievedContent);
+            	if (!recievedContent.startsWith("@")) {
+					// Parse packet
+	                Record newRecord = Parser.toRecord(recievedContent);
+	                System.out.println(newRecord.toGraphite());
+	                
+	                // Send data to Carbon
+	                /*
+	                List<String> channelData = newRecord.toGraphite();
+	                for (String chanelSample : channelData) {
+	                    graphiteClient.sendData(chanelSample);
+	                }
+	                */
+				}
+            }
+        } catch (Exception e) {
+        	e.printStackTrace();
+        }
     }
 
-    private class Consumer {
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        // Close the connection when an exception is raised.
+        cause.printStackTrace();
+        ctx.close();
+    }
 
-        public void run(int port) {
+    
+    private class Consumer extends ChannelInboundHandlerAdapter {
+
+        public void run() {
         	try{
-	        	ServerSocket serverSocket = new ServerSocket(port);
-	
-				while(true) {
-					System.out.println("Waiting for client on port " + serverSocket.getLocalPort() + "..."); 
-					Socket server = serverSocket.accept();
-					System.out.println("Just connected to " + server.getRemoteSocketAddress()); 
-		
-					PrintWriter toClient = 
-						new PrintWriter(server.getOutputStream(),true);
-					BufferedReader fromClient =
-						new BufferedReader(
-								new InputStreamReader(server.getInputStream()));
-					String line = fromClient.readLine();
-					System.out.println("Server received: " + line); 
+        		while (true) {
+                    //System.out.print((char) in.readByte());
+                    //System.out.flush();
+        			String recievedContent = "";
+					System.out.println("Server received: " + recievedContent); 
 					// To ignore the packets that the datalogger sends to test connection
 		            // and which has the following pattern: @67688989
-					if (!line.startsWith("@")) {
+					if (!recievedContent.startsWith("@")) {
 						// Parse packet
-		                Record newRecord = Parser.toRecord(line);
+		                Record newRecord = Parser.toRecord(recievedContent);
 		                System.out.println(newRecord.toGraphite());
 		                
 		                // Send data to Carbon
@@ -79,10 +110,9 @@ public class ServerHandler {
 		                    graphiteClient.sendData(chanelSample);
 		                }
 					}
-					toClient.println("Thank you for connecting to " + server.getLocalSocketAddress() + "\nGoodbye!"); 
 				}
 			}
-			catch(IOException e){
+			catch(Exception e){
 				e.printStackTrace();
 			}
         }

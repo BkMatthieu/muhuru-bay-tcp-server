@@ -1,6 +1,16 @@
 package org.mbmg.tcp.server;
 
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+
 public class Server { 
+	
 	private final int port;
     private final String graphiteHost;
     private final int graphitePort;
@@ -11,16 +21,39 @@ public class Server {
         this.port = port;
     }
 	
-	public void run() {
-		new ServerHandler(port, graphiteHost, graphitePort);
+	public void run() throws Exception {
+		EventLoopGroup bossGroup = new NioEventLoopGroup();
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        try {
+        	ServerBootstrap b = new ServerBootstrap();
+            b.group(bossGroup, workerGroup)
+             .channel(NioServerSocketChannel.class)
+             .childHandler(new ChannelInitializer<SocketChannel>() {
+                 @Override
+                 public void initChannel(SocketChannel ch) throws Exception {
+                     ch.pipeline().addLast(new ServerHandler(graphiteHost, graphitePort));
+                 }
+             })
+             .option(ChannelOption.SO_BACKLOG, 128)          
+             .childOption(ChannelOption.SO_KEEPALIVE, true);
+
+            // Bind and start to accept incoming connections.
+            ChannelFuture f = b.bind(port).sync();
+
+            // Wait until the server socket is closed.
+            f.channel().closeFuture().sync();
+        } finally {
+            workerGroup.shutdownGracefully();
+            bossGroup.shutdownGracefully();
+        }
 	}
 		
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 		int port;
         int graphitePort;
         String graphiteHost;
-        // Retrieve port specified in Sytem properties. Used port 6001 as default
-        port = Integer.parseInt(System.getProperty("org.mbmg.tcp.server.port","6002"));
+        // Retrieve port specified in System properties. Used port 6001 as default
+        port = Integer.parseInt(System.getProperty("org.mbmg.tcp.server.port","6001"));
         graphiteHost = System.getProperty("org.mbmg.graphite.server.host","localhost");
         graphitePort = Integer.parseInt(System.getProperty("org.mbmg.graphite.server.port","2003"));
         new Server(port, graphiteHost, graphitePort).run();

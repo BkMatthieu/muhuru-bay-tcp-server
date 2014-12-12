@@ -72,14 +72,14 @@ ext {
 }
 
 
-mainClassName = "org.mbmg.udp.server.Server"
+mainClassName = "org.mbmg.tcp.server.Server"
 
 jar {
     from {
          configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
     } 
     manifest {
-        attributes("Main-Class":"org.mbmg.udp.server.Server")
+        attributes("Main-Class":"org.mbmg.tcp.server.Server")
     }
 }
 
@@ -109,13 +109,13 @@ task wrapper(type: Wrapper) {
 
 task distBin(type: Zip, dependsOn: [jar, assemble]) {
     appendix = 'binary'
-    into("muhuru-bay-udp-server") {
+    into("muhuru-bay-tcp-server") {
         with distSpec
     }
 }
 
 ospackage {
-    packageName = 'muhuru-bay-udp-server'
+    packageName = 'muhuru-bay-tcp-server'
     version = "${versionMajor}.${versionMinor}.${versionPatch}"
     release = 1
     arch = I386
@@ -128,7 +128,7 @@ ospackage {
 
     requires('java')
 
-    into '/opt/muhuru-bay-udp-server'
+    into '/opt/muhuru-bay-tcp-server'
 
     from(jar.outputs.files) {
         into 'lib'
@@ -176,7 +176,7 @@ ssh {
 
 // Add a remote host
 remotes {
-    udpServer {
+    tcpServer {
         host = 'datalogger.maciq.com'
         user = 'datalogger'
         password = 'dalo$192'
@@ -184,20 +184,20 @@ remotes {
 }
 
 task deploy(type: SshTask, dependsOn: [clean, distBin]) {
-    description = 'Deploys the UDP Server'
+    description = 'Deploys the TCP Server'
     ssh {
         // Enable PTY allocation for sudo
         pty = true
     }
-    session(remotes.udpServer) {
-        put 'build/distributions/*.zip', '/home/datalogger/muhuru-bay-dashboard/muhuru-bay-udp-server'
-        execute '~/muhuru-bay-dashboard/muhuru-bay-udp-server/muhuru-bay-udp-server/bin/muhuru-bay-udp-server stop ||' +
+    session(remotes.tcpServer) {
+        put 'build/distributions/*.zip', '/home/datalogger/muhuru-bay-dashboard/muhuru-bay-tcp-server'
+        execute '~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/bin/muhuru-bay-tcp-server stop ||' +
                 ' true'
-        execute 'mv ~/muhuru-bay-dashboard/muhuru-bay-udp-server/muhuru-bay-udp-server ' +
-                '~/muhuru-bay-dashboard/muhuru-bay-udp-server/old/muhuru-bay-udp-server_' + buildTime() + ' || true'
-        execute 'cd ~/muhuru-bay-dashboard/muhuru-bay-udp-server && unzip *.zip'
-        execute 'rm ~/muhuru-bay-dashboard/muhuru-bay-udp-server/*.zip || true'
-        execute '~/muhuru-bay-dashboard/muhuru-bay-udp-server/muhuru-bay-udp-server/bin/muhuru-bay-udp-server start ' +
+        execute 'mv ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server ' +
+                '~/muhuru-bay-dashboard/muhuru-bay-tcp-server/old/muhuru-bay-tcp-server_' + buildTime() + ' || true'
+        execute 'cd ~/muhuru-bay-dashboard/muhuru-bay-tcp-server && unzip *.zip'
+        execute 'rm ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/*.zip || true'
+        execute '~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/bin/muhuru-bay-tcp-server start ' +
                 '|| true'
     }
 }

@@ -6,7 +6,7 @@ import java.net.*;
 public class Client {
   public void run() {
 	try {
-		int serverPort = 6002;
+		int serverPort = 6001;
 		InetAddress host = InetAddress.getByName("localhost"); 
 		System.out.println("Connecting to server on port " + serverPort); 
 
