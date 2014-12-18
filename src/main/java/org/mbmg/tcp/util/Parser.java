@@ -54,6 +54,7 @@ public class Parser {
      * @return a Record
      */
     public static Record toRecord(String line) {
+    	System.out.println(line);
         String[] columns = line.split(";");
         String[] headers = columns[0].split(":");
         //return new Record(Long.parseLong(headers[0]),

@@ -16,11 +16,13 @@ package org.mbmg.tcp.server;
  */
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.CharsetUtil;
@@ -54,29 +56,27 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf in = (ByteBuf) msg;
         try {
-            while (in.isReadable()) {
+            	String receivedContent = in.toString(io.netty.util.CharsetUtil.US_ASCII);
+            	new Consumer(receivedContent).start();
+            	
             	/*
-                System.out.print((char) in.readByte());
-                System.out.flush();
-                */
-            	String recievedContent = in.toString();
-            	System.out.println(recievedContent);
-            	if (!recievedContent.startsWith("@")) {
+            	if (!receivedContent.startsWith("@")) {
 					// Parse packet
-	                Record newRecord = Parser.toRecord(recievedContent);
+	                Record newRecord = Parser.toRecord(receivedContent);
 	                System.out.println(newRecord.toGraphite());
 	                
 	                // Send data to Carbon
-	                /*
+	                
 	                List<String> channelData = newRecord.toGraphite();
 	                for (String chanelSample : channelData) {
 	                    graphiteClient.sendData(chanelSample);
 	                }
-	                */
 				}
-            }
+				*/
         } catch (Exception e) {
-        	e.printStackTrace();
+            e.printStackTrace();
+        } finally {
+        	in.release();
         }
     }
 
@@ -87,29 +87,29 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
         ctx.close();
     }
 
-    
-    private class Consumer extends ChannelInboundHandlerAdapter {
+    private class Consumer extends Thread {
+    	
+    	private final String receivedContent;
 
+    	public Consumer(String receivedContent) {
+    		this.receivedContent = receivedContent;
+    	}
+    	
+		@Override
         public void run() {
+        
         	try{
-        		while (true) {
-                    //System.out.print((char) in.readByte());
-                    //System.out.flush();
-        			String recievedContent = "";
-					System.out.println("Server received: " + recievedContent); 
-					// To ignore the packets that the datalogger sends to test connection
-		            // and which has the following pattern: @67688989
-					if (!recievedContent.startsWith("@")) {
-						// Parse packet
-		                Record newRecord = Parser.toRecord(recievedContent);
-		                System.out.println(newRecord.toGraphite());
-		                
-		                // Send data to Carbon
-		                List<String> channelData = newRecord.toGraphite();
-		                for (String chanelSample : channelData) {
-		                    graphiteClient.sendData(chanelSample);
-		                }
-					}
+        		if (!receivedContent.startsWith("@")) {
+					// Parse packet
+	                Record newRecord = Parser.toRecord(receivedContent);
+	                System.out.println(newRecord.toGraphite());
+	                
+	                // Send data to Carbon
+	                List<String> channelData = newRecord.toGraphite();
+	                for (String chanelSample : channelData) {
+	                    graphiteClient.sendData(chanelSample);
+	                }   
+	                
 				}
 			}
 			catch(Exception e){
@@ -120,10 +120,11 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
 
     private static class GraphiteClient {
 
-        private static final EventLoopGroup group = new NioEventLoopGroup();
+        private static final EventLoopGroup bossGroup = new NioEventLoopGroup();
+        private static final EventLoopGroup workerGroup = new NioEventLoopGroup();
         private static final StringEncoder ENCODER = new StringEncoder();
         private static final WriteTimeoutHandler TIMEOUT_HANDLER = new WriteTimeoutHandler(120);
-        private static final Bootstrap bootstrap = new Bootstrap();
+        private static final ServerBootstrap bootstrap = new ServerBootstrap();
         private final String graphiteHost;
         private final int graphitePort;
         private boolean started = false;
@@ -138,24 +139,25 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
 
         public void startUp() {
             try {
-                if(bootstrap.group() == null) {
-                    bootstrap.group(group);
-                }
-                bootstrap.channel(NioSocketChannel.class);
-                bootstrap.option(ChannelOption.SO_KEEPALIVE, true);
-                bootstrap.handler(new ChannelInitializer<SocketChannel>() {
+            	bootstrap.group(bossGroup, workerGroup)
+                .channel(NioServerSocketChannel.class)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
                         ch.pipeline().addLast(ENCODER);
                         ch.pipeline().addLast(TIMEOUT_HANDLER);
                     }
-                });
-                ChannelFuture f = bootstrap.connect(graphiteHost, graphitePort).sync();
+                })
+                .option(ChannelOption.SO_KEEPALIVE, true);
+                ChannelFuture f = bootstrap.bind(graphitePort).sync();
                 this.connection = f.channel();
                 started = true;
+                f.channel().closeFuture().sync();
             } catch (Exception ex) {
                 ex.printStackTrace();
-                group.shutdownGracefully();
+            } finally {
+            	workerGroup.shutdownGracefully();
+                bossGroup.shutdownGracefully();
             }
         }
 

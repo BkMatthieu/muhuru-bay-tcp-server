@@ -8,6 +8,9 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.codec.LineBasedFrameDecoder;
+import io.netty.util.*;
 
 public class Server { 
 	
@@ -32,6 +35,9 @@ public class Server {
                  @Override
                  public void initChannel(SocketChannel ch) throws Exception {
                      ch.pipeline().addLast(new ServerHandler(graphiteHost, graphitePort));
+                     // Decoders
+                     //ch.pipeline().addLast("frameDecoder", new LineBasedFrameDecoder(80));
+                     //ch.pipeline().addLast("stringDecoder", new StringDecoder(CharsetUtil.UTF_8));
                  }
              })
              .option(ChannelOption.SO_BACKLOG, 128)          

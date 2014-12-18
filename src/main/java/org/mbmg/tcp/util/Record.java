@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Calendar;
+import java.util.TimeZone;
 
 /**
  * Created by rpomeroy on 4/26/14.
@@ -21,7 +23,7 @@ public class Record {
     static {
         channelCodeToName.put("A00", "Humidity");
         channelCodeToName.put("A01", "Solar_Controller_DC_Voltage");
-        channelCodeToName.put("A02", "Battery_Bus_DC_Voltage");
+        //channelCodeToName.put("A02", "Battery_Bus_DC_Voltage"); // commented out because multiplexed
         channelCodeToName.put("A03", "Inverter_AC_Voltage");
         channelCodeToName.put("A04", "Inverter_AC_Current");
         channelCodeToName.put("A05", "NA");
@@ -53,7 +55,7 @@ public class Record {
     static {
     	activeChannels.add("A00");
         activeChannels.add("A01");
-        activeChannels.add("A02");
+        //activeChannels.add("A02"); // A02 removed from Active Channel and will be added manully as it is multiplexed
         activeChannels.add("A03");
         activeChannels.add("A04");
         activeChannels.add("A09");
@@ -139,20 +141,79 @@ public class Record {
     public List<String> toGraphite() {
         // path value timestamp \n
         long epochTime = getEpochTime();
+        // K01 channel is actually a bit container. The Parser should probably be updated to take this
+        // into account.
+        double K01_A = 10000000000000000L;
+        double K01_B = 10010000000000000L;
+        Boolean flagk01_A = false;
+        Boolean flagk01_B = false;
+        
+        // clock time of the server in Nairobi time zone, converted to epochtime.
+        // UI used, only accepts UTC timezone. Also the timestamp received from Kenya
+        // is set to UTC. As such it will correctly read as time from Kenya. In other words,
+        // we don't want to apply any transformation since the timezone of the UI will always be
+        // UTC.
+        Long currentTime = LocalDateTime.now(ZoneId.of("Africa/Nairobi")).atZone(UTC).toEpochSecond();
+        
+        // calculate in mins the difference between the real time the packet was received and the timestamp embedded in
+        // the packet and which represents the time it was sent. It is supposed to represent the time duration
+        // the datalogger was off.
+        double timeOff = (currentTime - epochTime) / (60*1000);
+  
         List<String> data = new ArrayList();
+        // first loop to parse the de-multiplexer coded in channel K01
         for (Map.Entry<String,Double> entry : this.channelData.entrySet()) {
-            if (activeChannels.contains(entry.getKey())) {
+        	if (entry.getKey().equals("K01")) {        		
+        		if (entry.getValue() == K01_A) {
+        			flagk01_A = true;
+        		} else if (entry.getValue() == K01_B) {
+        			flagk01_B = true;
+        		}
+        	}
+        }
+        
+        // second loop to create the list
+        for (Map.Entry<String,Double> entry : this.channelData.entrySet()) {
+        	if (entry.getKey().equals("A02") && flagk01_A) {
+        		data.add(String.format(GRAPHITE_FORMAT,
+                        //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
+                   		"654321",		  // now different from the previous one
+                        "A02",
+                        "Battery_Bus_DC_Voltage",
+                        entry.getValue(),
+                        epochTime));
+       		} else if (entry.getKey().equals("A02") && flagk01_B) {
+        		data.add(String.format(GRAPHITE_FORMAT,
+                        //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
+                    	"654321",		  // now different from the previous one
+                        "A02",
+                        "Wind_Current",
+                        entry.getValue(),
+                        epochTime));
+        	} else if (activeChannels.contains(entry.getKey())) {
                 data.add(String.format(GRAPHITE_FORMAT,
-                        getStationID(),
+                        //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
+                		"654321",		  // now different from the previous one
                         entry.getKey(),
                         channelCodeToName.getOrDefault(entry.getKey(), entry.getKey()),
                         entry.getValue(),
                         epochTime));
             }
         }
+        data.add(String.format(GRAPHITE_FORMAT,
+                //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
+        		"654321",	      // now different from the previous one
+                "Debug",
+                "timeOff",
+                timeOff,
+                epochTime));
         return data;
     }
 
+    // UI used, only accepts UTC timezone. Also the timestamp received from Kenya
+    // is set to UTC. As such it will correctly read as time from Kenya. In other words,
+    // we don't want to apply any transformation since the timezone of the UI will always be
+    // UTC.
     private long getEpochTime() {
         return this.getTimestamp().atZone(UTC).toEpochSecond();
     }
