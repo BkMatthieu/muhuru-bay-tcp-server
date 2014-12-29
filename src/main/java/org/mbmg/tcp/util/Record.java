@@ -22,7 +22,7 @@ public class Record {
 
     static {
         channelCodeToName.put("A00", "Humidity");
-        channelCodeToName.put("A01", "Solar_Controller_DC_Voltage");
+        //channelCodeToName.put("A01", "Solar_Controller_DC_Voltage"); // commented out because multiplexed
         //channelCodeToName.put("A02", "Battery_Bus_DC_Voltage"); // commented out because multiplexed
         channelCodeToName.put("A03", "Inverter_AC_Voltage");
         channelCodeToName.put("A04", "Inverter_AC_Current");
@@ -54,8 +54,8 @@ public class Record {
 
     static {
     	activeChannels.add("A00");
-        activeChannels.add("A01");
-        //activeChannels.add("A02"); // A02 removed from Active Channel and will be added manully as it is multiplexed
+        //activeChannels.add("A01"); // A01 removed from Active Channel and will be added manually as it is multiplexed
+        //activeChannels.add("A02"); // A02 removed from Active Channel and will be added manually as it is multiplexed
         activeChannels.add("A03");
         activeChannels.add("A04");
         activeChannels.add("A09");
@@ -143,8 +143,8 @@ public class Record {
         long epochTime = getEpochTime();
         // K01 channel is actually a bit container. The Parser should probably be updated to take this
         // into account.
-        double K01_A = 10000000000000000L;
-        double K01_B = 10010000000000000L;
+        double K01_A = 10000330000000000L;
+        double K01_B = 10010330000000000L;
         Boolean flagk01_A = false;
         Boolean flagk01_B = false;
         
@@ -158,7 +158,7 @@ public class Record {
         // calculate in mins the difference between the real time the packet was received and the timestamp embedded in
         // the packet and which represents the time it was sent. It is supposed to represent the time duration
         // the datalogger was off.
-        double timeOff = (currentTime - epochTime) / (60*1000);
+        double timeOff = (currentTime - epochTime) / (60);
   
         List<String> data = new ArrayList();
         // first loop to parse the de-multiplexer coded in channel K01
@@ -174,22 +174,38 @@ public class Record {
         
         // second loop to create the list
         for (Map.Entry<String,Double> entry : this.channelData.entrySet()) {
-        	if (entry.getKey().equals("A02") && flagk01_A) {
+        	if (entry.getKey().equals("A01") && flagk01_A) {
         		data.add(String.format(GRAPHITE_FORMAT,
                         //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
                    		"654321",		  // now different from the previous one
-                        "A02",
-                        "Battery_Bus_DC_Voltage",
+                        "A01",
+                        "Solar_Controller_DC_Voltage",
                         entry.getValue(),
                         epochTime));
-       		} else if (entry.getKey().equals("A02") && flagk01_B) {
+       		} else if (entry.getKey().equals("A01") && flagk01_B) {
         		data.add(String.format(GRAPHITE_FORMAT,
                         //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
                     	"654321",		  // now different from the previous one
-                        "A02",
-                        "Wind_Current",
+                        "A01",
+                        "Dump_Load_Current",
                         entry.getValue(),
                         epochTime));
+       		} else if (entry.getKey().equals("A02") && flagk01_A) {
+            		data.add(String.format(GRAPHITE_FORMAT,
+                            //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
+                       		"654321",		  // now different from the previous one
+                            "A02",
+                            "Battery_Bus_DC_Voltage",
+                            entry.getValue(),
+                            epochTime));
+           		} else if (entry.getKey().equals("A02") && flagk01_B) {
+            		data.add(String.format(GRAPHITE_FORMAT,
+                            //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
+                        	"654321",		  // now different from the previous one
+                            "A02",
+                            "Wind_Current",
+                            entry.getValue(),
+                            epochTime));
         	} else if (activeChannels.contains(entry.getKey())) {
                 data.add(String.format(GRAPHITE_FORMAT,
                         //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is

@@ -17,6 +17,7 @@ public class Server {
 	private final int port;
     private final String graphiteHost;
     private final int graphitePort;
+    private final boolean started = false;
 
     public Server(int port, String graphiteHost, int graphitePort) {
         this.graphiteHost = graphiteHost;
@@ -28,13 +29,14 @@ public class Server {
 		EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
+        	System.out.println("Start Server, flag = " + started);
         	ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
              .childHandler(new ChannelInitializer<SocketChannel>() {
                  @Override
                  public void initChannel(SocketChannel ch) throws Exception {
-                     ch.pipeline().addLast(new ServerHandler(graphiteHost, graphitePort));
+                     ch.pipeline().addLast(new ServerHandler(graphiteHost, graphitePort, started));
                      // Decoders
                      //ch.pipeline().addLast("frameDecoder", new LineBasedFrameDecoder(80));
                      //ch.pipeline().addLast("stringDecoder", new StringDecoder(CharsetUtil.UTF_8));
@@ -48,7 +50,11 @@ public class Server {
 
             // Wait until the server socket is closed.
             f.channel().closeFuture().sync();
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Exception caught in Server");
         } finally {
+        	System.out.println("shutdownGracefully Server");
             workerGroup.shutdownGracefully();
             bossGroup.shutdownGracefully();
         }

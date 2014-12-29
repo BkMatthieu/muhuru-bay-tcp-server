@@ -15,64 +15,37 @@ package org.mbmg.tcp.server;
  * under the License.
  */
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.*;
+import io.netty.bootstrap.*;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.timeout.WriteTimeoutHandler;
-import io.netty.util.CharsetUtil;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.*;
+import io.netty.util.internal.StringUtil;
 
 import org.mbmg.tcp.util.Parser;
 import org.mbmg.tcp.util.Record;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.net.*;
-import java.io.*;
 
 public class ServerHandler extends ChannelInboundHandlerAdapter {
 	
     private final GraphiteClient graphiteClient;
 
-    public ServerHandler (String graphiteHost, int graphitePort) {
-        graphiteClient = new GraphiteClient(graphiteHost,graphitePort);
+    public ServerHandler (String graphiteHost, int graphitePort, boolean started) {
+        graphiteClient = new GraphiteClient(graphiteHost, graphitePort, started);
+        System.out.println("Constructor ServerHandler, create new Graphite object");
     }
     
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         ByteBuf in = (ByteBuf) msg;
         try {
-            	String receivedContent = in.toString(io.netty.util.CharsetUtil.US_ASCII);
-            	new Consumer(receivedContent).start();
-            	
-            	/*
-            	if (!receivedContent.startsWith("@")) {
-					// Parse packet
-	                Record newRecord = Parser.toRecord(receivedContent);
-	                System.out.println(newRecord.toGraphite());
-	                
-	                // Send data to Carbon
-	                
-	                List<String> channelData = newRecord.toGraphite();
-	                for (String chanelSample : channelData) {
-	                    graphiteClient.sendData(chanelSample);
-	                }
-				}
-				*/
+        	System.out.println("channelRead");
+        	String receivedContent = in.toString(io.netty.util.CharsetUtil.US_ASCII);
+            new Consumer(receivedContent).start();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -83,6 +56,8 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         // Close the connection when an exception is raised.
+    	System.out.println("Exception caught in ServerHandler");
+    	graphiteClient.shutdown();
         cause.printStackTrace();
         ctx.close();
     }
@@ -97,7 +72,6 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
     	
 		@Override
         public void run() {
-        
         	try{
         		if (!receivedContent.startsWith("@")) {
 					// Parse packet
@@ -105,11 +79,12 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
 	                System.out.println(newRecord.toGraphite());
 	                
 	                // Send data to Carbon
+	                /*
 	                List<String> channelData = newRecord.toGraphite();
 	                for (String chanelSample : channelData) {
 	                    graphiteClient.sendData(chanelSample);
 	                }   
-	                
+	                */
 				}
 			}
 			catch(Exception e){
@@ -120,63 +95,91 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
 
     private static class GraphiteClient {
 
-        private static final EventLoopGroup bossGroup = new NioEventLoopGroup();
-        private static final EventLoopGroup workerGroup = new NioEventLoopGroup();
+    	private static final EventLoopGroup group = new NioEventLoopGroup();
+    	private volatile ChannelFactory<? extends Channel> channelFactory;
         private static final StringEncoder ENCODER = new StringEncoder();
         private static final WriteTimeoutHandler TIMEOUT_HANDLER = new WriteTimeoutHandler(120);
-        private static final ServerBootstrap bootstrap = new ServerBootstrap();
+        private static final Bootstrap bootstrap = new Bootstrap();
         private final String graphiteHost;
         private final int graphitePort;
-        private boolean started = false;
+        private boolean started;
 
         private Channel connection;
 
-        private GraphiteClient(String graphiteHost, int graphitePort) {
+        private GraphiteClient(String graphiteHost, int graphitePort, boolean started) {
             this.graphiteHost = graphiteHost;
             this.graphitePort = graphitePort;
-            this.started = false;
+            this.started = started;
         }
-
+      
         public void startUp() {
+        	System.out.println("Enter StartUp");
+
             try {
-            	bootstrap.group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .childHandler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    public void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(ENCODER);
-                        ch.pipeline().addLast(TIMEOUT_HANDLER);
-                    }
-                })
-                .option(ChannelOption.SO_KEEPALIVE, true);
-                ChannelFuture f = bootstrap.bind(graphitePort).sync();
-                this.connection = f.channel();
-                started = true;
-                f.channel().closeFuture().sync();
+                if(bootstrap.group() == null) {
+                    bootstrap.group(group);
+                }
+                channelFactory = new BootstrapChannelFactory<Channel>(NioSocketChannel.class);
+                bootstrap.channel(NioSocketChannel.class)
+	            .option(ChannelOption.SO_KEEPALIVE, true)
+	            .handler(new ChannelInitializer<SocketChannel>() {
+	            	@Override
+	            	public void initChannel(SocketChannel ch) throws Exception {
+	            		ch.pipeline().addLast(ENCODER);
+	                    ch.pipeline().addLast(TIMEOUT_HANDLER);
+	                }
+	            });
+	            ChannelFuture f = bootstrap.connect(graphiteHost, graphitePort).sync();
+	            this.connection = f.channel();
+	            this.started = true;
+	            f.channel().closeFuture().sync();        
             } catch (Exception ex) {
+            	System.out.println("Exception Start up");
                 ex.printStackTrace();
-            } finally {
-            	workerGroup.shutdownGracefully();
-                bossGroup.shutdownGracefully();
-            }
+                group.shutdownGracefully();
+            } 	        	
         }
 
         public void sendData(String data) {
             // Connect lazily to make start work even if graphite isn't up
-            if(connection == null || started == false) {
+            if(this.started == false) {
+            	System.out.println("Start Connection");
                 startUp();
             }
-            if (connection != null && connection.isOpen()) {
-                connection.writeAndFlush(data);
+            if (this.started == true) {
+            	System.out.println("Connection already started");
+                this.connection.writeAndFlush(data);
             }
         }
 
         public void shutdown() {
             if (connection != null) {
+            	channelFactory = null;
                 connection.close().awaitUninterruptibly();
+                System.out.println("--- GRAPHITE CLIENT - Closing connection.");
             }
             System.out.println("--- GRAPHITE CLIENT - Stopped.");
         }
 
     }
+    /*
+    private static final class BootstrapChannelFactory<T extends Channel> implements ChannelFactory<T> {
+    	private final Class<? extends T> clazz;
+    		BootstrapChannelFactory(Class<? extends T> clazz) {
+    			this.clazz = clazz;
+    		}
+    		@Override
+    		public T newChannel() {
+    			try {
+    				return clazz.newInstance();
+    			} catch (Throwable t) {
+    				throw new ChannelException("Unable to create Channel from class " + clazz, t);
+    			}
+    		}
+    		@Override
+    		public String toString() {
+    			return StringUtil.simpleClassName(clazz) + ".class";
+    		}
+    }
+    */
 }
