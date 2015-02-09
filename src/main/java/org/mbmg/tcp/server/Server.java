@@ -8,20 +8,13 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.string.StringDecoder;
-import io.netty.handler.codec.LineBasedFrameDecoder;
-import io.netty.util.*;
 
 public class Server { 
 	
 	private final int port;
-    private final String graphiteHost;
-    private final int graphitePort;
     private final boolean started = false;
 
-    public Server(int port, String graphiteHost, int graphitePort) {
-        this.graphiteHost = graphiteHost;
-        this.graphitePort = graphitePort;
+    public Server(int port) {
         this.port = port;
     }
 	
@@ -36,14 +29,13 @@ public class Server {
              .childHandler(new ChannelInitializer<SocketChannel>() {
                  @Override
                  public void initChannel(SocketChannel ch) throws Exception {
-                     ch.pipeline().addLast(new ServerHandler(graphiteHost, graphitePort, started));
+                     ch.pipeline().addLast(new ServerHandler());
                      // Decoders
                      //ch.pipeline().addLast("frameDecoder", new LineBasedFrameDecoder(80));
                      //ch.pipeline().addLast("stringDecoder", new StringDecoder(CharsetUtil.UTF_8));
                  }
              })
-             .option(ChannelOption.SO_BACKLOG, 128)          
-             .childOption(ChannelOption.SO_KEEPALIVE, true);
+             .option(ChannelOption.SO_BACKLOG, 128);
 
             // Bind and start to accept incoming connections.
             ChannelFuture f = b.bind(port).sync();
@@ -62,12 +54,8 @@ public class Server {
 		
 	public static void main(String[] args) throws Exception {
 		int port;
-        int graphitePort;
-        String graphiteHost;
         // Retrieve port specified in System properties. Used port 6001 as default
         port = Integer.parseInt(System.getProperty("org.mbmg.tcp.server.port","6001"));
-        graphiteHost = System.getProperty("org.mbmg.graphite.server.host","localhost");
-        graphitePort = Integer.parseInt(System.getProperty("org.mbmg.graphite.server.port","2003"));
-        new Server(port, graphiteHost, graphitePort).run();
+        new Server(port).run();
 	}
 }

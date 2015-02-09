@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Calendar;
-import java.util.TimeZone;
 
 /**
  * Created by rpomeroy on 4/26/14.
@@ -195,15 +193,15 @@ public class Record {
                             //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
                        		"654321",		  // now different from the previous one
                             "A02",
-                            "Battery_Bus_DC_Voltage",
+                            "Wind_Current",
                             entry.getValue(),
                             epochTime));
-           		} else if (entry.getKey().equals("A02") && flagk01_B) {
+           	} else if (entry.getKey().equals("A02") && flagk01_B) {
             		data.add(String.format(GRAPHITE_FORMAT,
                             //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
                         	"654321",		  // now different from the previous one
                             "A02",
-                            "Wind_Current",
+                            "Battery_Bus_DC_Voltage",
                             entry.getValue(),
                             epochTime));
         	} else if (activeChannels.contains(entry.getKey())) {
