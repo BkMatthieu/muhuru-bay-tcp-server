@@ -2,10 +2,14 @@ package org.mbmg.tcp.util;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Created by rpomeroy on 4/26/14.
@@ -66,6 +70,8 @@ public class Record {
     	activeChannels.add("P05");
 
     }
+    
+    static Logger Logger = LoggerFactory.getLogger("MyRecord");
     
     private Long recordNumber;
     private String recordType;
@@ -131,6 +137,11 @@ public class Record {
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
+    
+    public String formatTimestamp() {
+    	DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm:ss");
+        return this.getTimestamp().format(formatter);
+    }
 
     public Map<String, Double> getChannelData() {
         return channelData;
@@ -143,6 +154,7 @@ public class Record {
         // into account.
         double K01_A = 10000330000000000L;
         double K01_B = 10010330000000000L;
+        double K01_value = 0;
         Boolean flagk01_A = false;
         Boolean flagk01_B = false;
         
@@ -164,8 +176,10 @@ public class Record {
         	if (entry.getKey().equals("K01")) {        		
         		if (entry.getValue() == K01_A) {
         			flagk01_A = true;
+        			K01_value = entry.getValue();
         		} else if (entry.getValue() == K01_B) {
         			flagk01_B = true;
+        			K01_value = entry.getValue();
         		}
         	}
         }
@@ -180,6 +194,7 @@ public class Record {
                         "Solar_Controller_DC_Voltage",
                         entry.getValue(),
                         epochTime));
+        		Logger.info(",654321,A01,Solar_Controller_DC_Voltage"+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
        		} else if (entry.getKey().equals("A01") && flagk01_B) {
         		data.add(String.format(GRAPHITE_FORMAT,
                         //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
@@ -188,6 +203,7 @@ public class Record {
                         "Dump_Load_Current",
                         entry.getValue(),
                         epochTime));
+        		Logger.info(",654321,A01,Dump_Load_Current"+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
        		} else if (entry.getKey().equals("A02") && flagk01_A) {
             		data.add(String.format(GRAPHITE_FORMAT,
                             //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
@@ -196,6 +212,7 @@ public class Record {
                             "Wind_Current",
                             entry.getValue(),
                             epochTime));
+            		Logger.info(",654321,A02,Wind_Current"+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
            	} else if (entry.getKey().equals("A02") && flagk01_B) {
             		data.add(String.format(GRAPHITE_FORMAT,
                             //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
@@ -204,6 +221,7 @@ public class Record {
                             "Battery_Bus_DC_Voltage",
                             entry.getValue(),
                             epochTime));
+            		Logger.info(",654321,A02,Battery_Bus_DC_Voltage"+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
         	} else if (activeChannels.contains(entry.getKey())) {
                 data.add(String.format(GRAPHITE_FORMAT,
                         //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
@@ -212,6 +230,7 @@ public class Record {
                         channelCodeToName.getOrDefault(entry.getKey(), entry.getKey()),
                         entry.getValue(),
                         epochTime));
+                Logger.info(",654321,"+entry.getKey()+","+channelCodeToName.getOrDefault(entry.getKey(), entry.getKey())+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
             }
         }
         data.add(String.format(GRAPHITE_FORMAT,

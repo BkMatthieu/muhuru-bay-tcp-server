@@ -57,6 +57,7 @@ ext {
     distSpec = copySpec {
         into("conf") {
             from "src/main/conf"
+            from "src/main/resource"
         }
         into("bin") {
             from "src/main/bin"
@@ -88,6 +89,9 @@ dependencies {
     compile 'ch.qos.logback:logback-classic:1.1.2'
     compile 'ch.qos.logback:logback-core:1.1.2'
     compile 'javassist:javassist:3.12.1.GA'
+    compile 'org.slf4j:slf4j-api:1.7.6'
+    compile 'ch.qos.logback:logback-classic:1.1.2'
+    compile 'ch.qos.logback:logback-core:1.1.2'
 
     /**
      * Mandatory dependencies for using Spock test framework
@@ -196,7 +200,11 @@ task deploy(type: SshTask, dependsOn: [clean, distBin]) {
         execute 'mv ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server ' +
                 '~/muhuru-bay-dashboard/muhuru-bay-tcp-server/old/muhuru-bay-tcp-server_' + buildTime() + ' || true'
         execute 'cd ~/muhuru-bay-dashboard/muhuru-bay-tcp-server && unzip *.zip'
+        execute 'dos2unix ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/bin/muhuru-bay-tcp-server'
+        execute 'chmod +x ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/bin/muhuru-bay-tcp-server'
+        execute 'dos2unix ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/conf/*'
         execute 'rm ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/*.zip || true'
+        execute 'mkdir ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/logs'
         execute '~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/bin/muhuru-bay-tcp-server start ' +
                 '|| true'
     }
