@@ -67,7 +67,6 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
         		if (!receivedContent.startsWith("@")) {
 					// Parse packet
 	                Record newRecord = Parser.toRecord(receivedContent);
-	                System.out.println(newRecord.toGraphite());
 	                
 	                // Send data to Carbon
 	                List<String> channelData = newRecord.toGraphite();

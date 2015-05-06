@@ -21,6 +21,7 @@ public class Record {
     private static ZoneId UTC = ZoneId.of("UTC");
     private static Map<String,String> channelCodeToName = new HashMap<>();
     private static List<String> activeChannels = new ArrayList<>();
+    private static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm:ss");
 
     static {
         channelCodeToName.put("A00", "Humidity");
@@ -139,7 +140,6 @@ public class Record {
     }
     
     public String formatTimestamp() {
-    	DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy HH:mm:ss");
         return this.getTimestamp().format(formatter);
     }
 
@@ -163,12 +163,9 @@ public class Record {
         // is set to UTC. As such it will correctly read as time from Kenya. In other words,
         // we don't want to apply any transformation since the timezone of the UI will always be
         // UTC.
-        Long currentTime = LocalDateTime.now(ZoneId.of("Africa/Nairobi")).atZone(UTC).toEpochSecond();
-        
-        // calculate in mins the difference between the real time the packet was received and the timestamp embedded in
-        // the packet and which represents the time it was sent. It is supposed to represent the time duration
-        // the datalogger was off.
-        double timeOff = (currentTime - epochTime) / (60);
+        LocalDateTime currentTime = LocalDateTime.now(ZoneId.of("Africa/Nairobi"));
+        Long currentTimeEpoch = currentTime.atZone(UTC).toEpochSecond();
+        String currentTimeFormatTimestamp = currentTime.format(formatter);
   
         List<String> data = new ArrayList();
         // first loop to parse the de-multiplexer coded in channel K01
@@ -193,8 +190,8 @@ public class Record {
                         "A01",
                         "Solar_Controller_DC_Voltage",
                         entry.getValue(),
-                        epochTime));
-        		Logger.info(",654321,A01,Solar_Controller_DC_Voltage"+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
+                        currentTimeEpoch));
+        		Logger.info(",654321,A01,Solar_Controller_DC_Voltage"+","+entry.getValue()+","+Double.toString(K01_value)+","+currentTimeFormatTimestamp);
        		} else if (entry.getKey().equals("A01") && flagk01_B) {
         		data.add(String.format(GRAPHITE_FORMAT,
                         //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
@@ -202,8 +199,8 @@ public class Record {
                         "A01",
                         "Dump_Load_Current",
                         entry.getValue(),
-                        epochTime));
-        		Logger.info(",654321,A01,Dump_Load_Current"+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
+                        currentTimeEpoch));
+        		Logger.info(",654321,A01,Dump_Load_Current"+","+entry.getValue()+","+Double.toString(K01_value)+","+currentTimeFormatTimestamp);
        		} else if (entry.getKey().equals("A02") && flagk01_A) {
             		data.add(String.format(GRAPHITE_FORMAT,
                             //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
@@ -211,8 +208,8 @@ public class Record {
                             "A02",
                             "Wind_Current",
                             entry.getValue(),
-                            epochTime));
-            		Logger.info(",654321,A02,Wind_Current"+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
+                            currentTimeEpoch));
+            		Logger.info(",654321,A02,Wind_Current"+","+entry.getValue()+","+Double.toString(K01_value)+","+currentTimeFormatTimestamp);
            	} else if (entry.getKey().equals("A02") && flagk01_B) {
             		data.add(String.format(GRAPHITE_FORMAT,
                             //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
@@ -220,8 +217,8 @@ public class Record {
                             "A02",
                             "Battery_Bus_DC_Voltage",
                             entry.getValue(),
-                            epochTime));
-            		Logger.info(",654321,A02,Battery_Bus_DC_Voltage"+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
+                            currentTimeEpoch));
+            		Logger.info(",654321,A02,Battery_Bus_DC_Voltage"+","+entry.getValue()+","+Double.toString(K01_value)+","+currentTimeFormatTimestamp);
         	} else if (activeChannels.contains(entry.getKey())) {
                 data.add(String.format(GRAPHITE_FORMAT,
                         //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
@@ -229,17 +226,11 @@ public class Record {
                         entry.getKey(),
                         channelCodeToName.getOrDefault(entry.getKey(), entry.getKey()),
                         entry.getValue(),
-                        epochTime));
-                Logger.info(",654321,"+entry.getKey()+","+channelCodeToName.getOrDefault(entry.getKey(), entry.getKey())+","+entry.getValue()+","+Double.toString(K01_value)+","+this.formatTimestamp());
+                        currentTimeEpoch));
+                Logger.info(",654321,"+entry.getKey()+","+channelCodeToName.getOrDefault(entry.getKey(), entry.getKey())+","+entry.getValue()+","+Double.toString(K01_value)+","+currentTimeFormatTimestamp);
             }
         }
-        data.add(String.format(GRAPHITE_FORMAT,
-                //getStationID(), // hardcoded to 654321 as the datalogger has been changed and the device ID is
-        		"654321",	      // now different from the previous one
-                "Debug",
-                "timeOff",
-                timeOff,
-                epochTime));
+        System.out.println(data);
         return data;
     }
 
