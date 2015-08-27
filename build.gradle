@@ -204,7 +204,6 @@ task deploy(type: SshTask, dependsOn: [clean, distBin]) {
         execute 'chmod +x ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/bin/muhuru-bay-tcp-server'
         execute 'dos2unix ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/conf/*'
         execute 'rm ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/*.zip || true'
-        execute 'mkdir ~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/logs'
         execute '~/muhuru-bay-dashboard/muhuru-bay-tcp-server/muhuru-bay-tcp-server/bin/muhuru-bay-tcp-server start ' +
                 '|| true'
     }
